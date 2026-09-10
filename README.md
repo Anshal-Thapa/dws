@@ -67,3 +67,8 @@ manager.transfer(alice.wallet_id, shop.wallet_id, 500)
 print(alice.balance)   # 500.0
 print(shop.balance)    # 500.0 minus the settlement fee
 ```
+
+
+## Quick Note
+
+I vibecoded the testcases part, but understood it
