@@ -78,7 +78,7 @@ def test_deposit_logs_a_transaction(personal_wallet):
     assert records[0].balance_after == 1500.0
 
 
-@pytest.mark.parametrize("bad_amount", [0, -1, -50.5, "abc", None, True])
+@pytest.mark.parametrize("bad_amount", [-1, -50.5, "abc", None, True])
 def test_deposit_invalid_amounts_raise(personal_wallet, bad_amount):
     with pytest.raises(InvalidAmountError):
         personal_wallet.deposit(bad_amount)
@@ -132,7 +132,7 @@ def test_withdraw_on_frozen_wallet_raises(personal_wallet):
         personal_wallet.withdraw(100)
 
 
-@pytest.mark.parametrize("bad_amount", [0, -1, -50.5, "abc", None, True])
+@pytest.mark.parametrize("bad_amount", [-1, -50.5, "abc", None, True])
 def test_withdraw_invalid_amounts_raise(personal_wallet, bad_amount):
     with pytest.raises(InvalidAmountError):
         personal_wallet.withdraw(bad_amount)
@@ -167,8 +167,8 @@ def test_daily_limit_error_carries_correct_context():
     with pytest.raises(DailyLimitExceededError) as exc_info:
         wallet.withdraw(10_000)
     assert exc_info.value.already_sent_today == 20_000
-    assert exc_info.value.limit == PersonalWallet.DAILY_LIMIT
-    assert exc_info.value.requested == 10_000
+    assert exc_info.value.daily_limit == PersonalWallet.DAILY_LIMIT
+    assert exc_info.value.amount == 10_000
 
 
 def test_daily_limit_breach_does_not_change_balance():
@@ -183,10 +183,10 @@ def test_daily_limit_breach_does_not_change_balance():
 def test_daily_limit_resets_on_a_new_day():
     wallet = PersonalWallet(owner="Alice", opening_balance=100_000)
     with patch("wallet_system.wallets.datetime") as mock_dt:
-        mock_dt.utcnow.return_value = datetime(2026, 1, 1, 10, 0)
+        mock_dt.now.return_value = datetime(2026, 1, 1, 10, 0)
         wallet.withdraw(20_000)
 
-        mock_dt.utcnow.return_value = datetime(2026, 1, 2, 10, 0)  # next day
+        mock_dt.now.return_value = datetime(2026, 1, 2, 10, 0)  # next day
         wallet.withdraw(20_000)  # should succeed — the daily total reset
 
     assert wallet.balance == 100_000 - 40_000

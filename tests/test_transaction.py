@@ -5,7 +5,7 @@ Kept independent of BaseWallet where possible — these classes have no
 dependency on wallets, so they shouldn't need one to be tested.
 """
 from dataclasses import FrozenInstanceError
-from datetime import datetime,UTC
+from datetime import datetime
 
 import pytest
 
@@ -18,7 +18,7 @@ def make_transaction(amount: float = 100.0, txn_type: TransactionType = Transact
         id="txn-1",
         type=txn_type,
         amount=amount,
-        timestamp=datetime.now(UTC),
+        timestamp=datetime.now(),
         balance_after=amount,
     )
 
