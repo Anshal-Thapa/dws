@@ -1,5 +1,5 @@
 from abc import ABC,abstractmethod
-from datetime import datetime, UTC
+from datetime import datetime
 from typing import ClassVar, Iterator
 import uuid
 
@@ -57,7 +57,7 @@ class BaseWallet(ABC):
                 id=str(uuid.uuid4()),
                 type= transaction_type,
                 amount=amount,
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(),
                 balance_after=self._balance
             )
         )
@@ -73,13 +73,17 @@ class BaseWallet(ABC):
                 id=str(uuid.uuid4()),
                 type= transaction_type,
                 amount=amount,
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(),
                 balance_after=self._balance
             )
         )
 
+    @property
+    def transactions(self) ->Iterator[Transaction]:
+        return iter(self._history)
+
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, WalletType) and self._wallet_id == other._wallet_id
+        return isinstance(other, BaseWallet) and self._wallet_id == other._wallet_id
 
     def __len__(self):
         return len(self._history)
@@ -98,12 +102,13 @@ class PersonalWallet(BaseWallet):
         return WalletType.PERSONAL
 
     def _sent_today(self) -> float:
-            today = datetime.now(UTC).date()
+            today = datetime.now().date()
             return sum(
                 transaction.amount for transaction in self._history if transaction.type in (TransactionType.WITHDRAWAL,TransactionType.TRANSFER_OUT) and transaction.timestamp.date() == today
             )
     
     def withdraw(self, amount, *, transaction_type = TransactionType.WITHDRAWAL) -> None:
+        amount = self._validate_amount(amount)
         if self._sent_today() + amount > self.DAILY_LIMIT:
             raise DailyLimitExceededError(amount, self.DAILY_LIMIT, self._sent_today())
         super().withdraw(amount, transaction_type=transaction_type)
@@ -125,7 +130,7 @@ class MerchantWallet(BaseWallet):
                 id=str(uuid.uuid4()),
                 type=TransactionType.FEE,
                 amount=fee,
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(),
                 balance_after=self._balance
             )
         )
