@@ -1,14 +1,14 @@
-from enum import Enum
+from enum import StrEnum,auto
 
-class TransactionType(str, Enum):
-    DEPOSIT = "DEPOSIT"
-    WITHDRAWAL = "WITHDRAWAL"
-    TRANSFER_IN = "TRANSFER_IN"
-    TRANSFER_OUT = "TRANSFER_OUT"
-    FEE = "FEE"
-    REFUND = "REFUND"
+class TransactionType(StrEnum):
+    DEPOSIT = auto()
+    WITHDRAWAL = auto()
+    TRANSFER_IN = auto()
+    TRANSFER_OUT = auto()
+    FEE = auto()
+    REFUND = auto()
 
-class WalletType(str, Enum):
-    PERSONAL = "PERSONAL"
-    MERCHANT = "MERCHANT"
+class WalletType(StrEnum):
+    PERSONAL = auto()
+    MERCHANT = auto()
     
