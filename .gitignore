@@ -1,1 +1,8 @@
-__pycache__
+__pycache__/
+*.pyc
+.env
+venv/
+__pycache__/
+*.pyc
+expenses.json
+.pytest_cache/
