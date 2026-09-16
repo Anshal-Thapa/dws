@@ -1,19 +1,31 @@
-from abc import ABC,abstractmethod
-from datetime import datetime
-from typing import ClassVar, Iterator
 import uuid
+from abc import ABC, abstractmethod
+from ast import List
+from datetime import datetime, timezone
+from typing import ClassVar, Iterator
 
-from wallet_system.enums import TransactionType,WalletType
-from wallet_system.exceptions import DailyLimitExceededError, FrozenAccountError, InsufficientFundsError, InvalidAmountError
-from wallet_system.transaction import Transaction, TransactionHistory
+from wallet_system.enums import TransactionType, WalletType
+from wallet_system.exceptions import (
+    DailyLimitExceededError,
+    FrozenAccountError,
+    InsufficientFundsError,
+    InvalidAmountError,
+)
+from wallet_system.transaction import (
+    Transaction,
+    TransactionHistory,
+    TransactionObserver,
+)
+
 
 class BaseWallet(ABC):
-    def __init__(self, owner: str,opening_balance: float = 0.0):
+    def __init__(self, owner: str, opening_balance: float = 0.0):
         self._wallet_id = str(uuid.uuid4())
         self._owner = owner
         self._balance = self._validate_amount(opening_balance)
         self._history = TransactionHistory()
         self._frozen = False
+        self._observers: List[TransactionObserver] = []
 
     @property
     def balance(self) -> float:
@@ -29,7 +41,11 @@ class BaseWallet(ABC):
     def unfreeze(self) -> None:
         self._frozen = False
 
-    def _check_not_frozen(self) -> None: #Need to understand the purpose of this function. Why here and not elsewhere.
+    def _check_not_frozen(
+        self,
+    ) -> (
+        None
+    ):  # Need to understand the purpose of this function. Why here and not elsewhere.
         if self._frozen:
             raise FrozenAccountError(self._wallet_id)
 
@@ -44,42 +60,66 @@ class BaseWallet(ABC):
 
     @staticmethod
     def _validate_amount(amount: float) -> None:
-        if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount < 0:
+        if (
+            not isinstance(amount, (int, float))
+            or isinstance(amount, bool)
+            or amount < 0
+        ):
             raise InvalidAmountError(amount)
         return amount
 
-    def deposit(self, amount: float, *,transaction_type: TransactionType = TransactionType.DEPOSIT) -> None: #WTF
+
+    def attach(self, observer: TransactionObserver) -> None:
+        self._observers.append(observer)
+
+    def detach(self, observer: TransactionObserver) -> None:
+        self._observers.remove(observer)
+    
+
+    def _notify(self, transaction):
+        for observer in self._observers:
+            observer.update(self, transaction)
+
+
+    def _record(self, amount, transaction_type):
+        transaction = Transaction(
+            id=str(uuid.uuid4()),
+            type=transaction_type,
+            amount=amount,
+            timestamp=datetime.now(timezone.utc),
+            balance_after=self._balance,
+        )
+        self._history.add(transaction)
+        self._notify(transaction)
+        return transaction
+        
+
+    def deposit(
+        self,
+        amount: float,
+        *,
+        transaction_type: TransactionType = TransactionType.DEPOSIT,
+    ) -> None:
         self._check_not_frozen()
         amount = self._validate_amount(amount)
         self._balance += amount
-        self._history.add(
-            Transaction(
-                id=str(uuid.uuid4()),
-                type= transaction_type,
-                amount=amount,
-                timestamp=datetime.now(),
-                balance_after=self._balance
-            )
-        )
+        self._record(amount, transaction_type)
 
-    def withdraw(self, amount: float, *,transaction_type: TransactionType = TransactionType.WITHDRAWAL) -> None:
+    def withdraw(
+        self,
+        amount: float,
+        *,
+        transaction_type: TransactionType = TransactionType.WITHDRAWAL,
+    ) -> None:
         self._check_not_frozen()
         amount = self._validate_amount(amount)
         if amount > self._balance:
             raise InsufficientFundsError(amount, self._balance)
         self._balance -= amount
-        self._history.add(
-            Transaction(
-                id=str(uuid.uuid4()),
-                type= transaction_type,
-                amount=amount,
-                timestamp=datetime.now(),
-                balance_after=self._balance
-            )
-        )
+        self._record(amount, transaction_type)
 
     @property
-    def transactions(self) ->Iterator[Transaction]:
+    def transactions(self) -> Iterator[Transaction]:
         return iter(self._history)
 
     def __eq__(self, other: object) -> bool:
@@ -92,7 +132,14 @@ class BaseWallet(ABC):
         return iter(self._history)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} wallet_id={self._wallet_id}, owner={self._owner}, balance={self._balance}, frozen={self._frozen}>"
+        return (
+            f"<{self.__class__.__name__} "
+            f"wallet_id={self._wallet_id}, "
+            f"owner={self._owner}, "
+            f"balance={self._balance}, "
+            f"frozen={self._frozen}>"
+        )
+
 
 class PersonalWallet(BaseWallet):
     DAILY_LIMIT: ClassVar[float] = 25_000.0
@@ -102,18 +149,26 @@ class PersonalWallet(BaseWallet):
         return WalletType.PERSONAL
 
     def _sent_today(self) -> float:
-            today = datetime.now().date()
-            return sum(
-                transaction.amount for transaction in self._history if transaction.type in (TransactionType.WITHDRAWAL,TransactionType.TRANSFER_OUT) and transaction.timestamp.date() == today
-            )
-    
-    def withdraw(self, amount, *, transaction_type = TransactionType.WITHDRAWAL) -> None:
+        today = datetime.now(timezone.utc).date()
+        return sum(
+            transaction.amount
+            for transaction in self._history
+            if transaction.type
+            in (TransactionType.WITHDRAWAL, TransactionType.TRANSFER_OUT)
+            and transaction.timestamp.date() == today
+        )
+
+    def withdraw(self, amount, *, transaction_type=TransactionType.WITHDRAWAL) -> None:
         amount = self._validate_amount(amount)
         if self._sent_today() + amount > self.DAILY_LIMIT:
-            raise DailyLimitExceededError(amount, self.DAILY_LIMIT, self._sent_today())
+            raise DailyLimitExceededError(
+                amount,
+                self.DAILY_LIMIT,
+                self._sent_today()
+            )
         super().withdraw(amount, transaction_type=transaction_type)
 
-    
+
 class MerchantWallet(BaseWallet):
     FEE_RATE: ClassVar[float] = 0.015
 
@@ -121,17 +176,8 @@ class MerchantWallet(BaseWallet):
     def wallet_type(self) -> WalletType:
         return WalletType.MERCHANT
 
-    def deposit(self, amount, *, transaction_type = TransactionType.DEPOSIT) -> None:
+    def deposit(self, amount, *, transaction_type=TransactionType.DEPOSIT) -> None:
         amount = self._validate_amount(amount)
         fee = round(amount * self.FEE_RATE, 2)
         super().deposit(amount - fee, transaction_type=transaction_type)
-        self._history.add(
-            Transaction(
-                id=str(uuid.uuid4()),
-                type=TransactionType.FEE,
-                amount=fee,
-                timestamp=datetime.now(),
-                balance_after=self._balance
-            )
-        )
-    
+        self._record(fee, TransactionType.FEE)
