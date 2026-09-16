@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:d
+      - .:/usr/src/app
+    ports:
+      - "8000:8000"
+    command: python main.py
