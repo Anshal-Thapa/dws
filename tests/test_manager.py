@@ -7,6 +7,7 @@ from wallet_system.exceptions import (
     FrozenAccountError,
     DailyLimitExceededError,
 )
+from wallet_system.strategies import FlatFeeStrategy
 from wallet_system.wallets import PersonalWallet, MerchantWallet
 
 def test_get_unknown_id_raises_account_not_found(manager):
@@ -65,7 +66,7 @@ def test_transfer_applies_merchant_fee_when_receiver_is_merchant(manager):
 
     manager.transfer(alice.wallet_id, shop.wallet_id, 1000)
 
-    expected_fee = round(1000 * MerchantWallet.FEE_RATE, 2)
+    expected_fee = FlatFeeStrategy().calculate_fee(1000)
     assert alice.balance == 0
     assert shop.balance == 1000 - expected_fee
 

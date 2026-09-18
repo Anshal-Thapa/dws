@@ -24,7 +24,7 @@ def test_wallet_type_is_merchant(merchant_wallet):
 
 def test_deposit_credits_amount_minus_fee(merchant_wallet):
     merchant_wallet.deposit(1000)
-    expected_fee = round(1000 * MerchantWallet.FEE_RATE, 2)
+    expected_fee = merchant_wallet._fee_strategy.calculate_fee(1000)
     assert merchant_wallet.balance == 1000 - expected_fee
 
 
@@ -36,7 +36,7 @@ def test_deposit_logs_two_separate_transactions(merchant_wallet):
     deposit_record = next(r for r in records if r.type == TransactionType.DEPOSIT)
     fee_record = next(r for r in records if r.type == TransactionType.FEE)
 
-    expected_fee = round(1000 * MerchantWallet.FEE_RATE, 2)
+    expected_fee = merchant_wallet._fee_strategy.calculate_fee(1000)
     assert deposit_record.amount == 1000 - expected_fee
     assert fee_record.amount == expected_fee
 
