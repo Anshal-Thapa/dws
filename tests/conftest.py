@@ -1,9 +1,9 @@
 import pytest
- 
+
 from wallet_system.manager import WalletManager
-from wallet_system.wallets import PersonalWallet, MerchantWallet
- 
- 
+from wallet_system.wallets import MerchantWallet, PersonalWallet
+
+
 @pytest.fixture
 def manager() -> WalletManager:
     return WalletManager()

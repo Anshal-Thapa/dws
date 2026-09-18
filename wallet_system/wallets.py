@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import uuid
 from abc import ABC, abstractmethod
 from ast import List
+from collections.abc import Iterator
 from datetime import datetime, timezone
-from typing import ClassVar, Iterator
+from typing import ClassVar
 
 from wallet_system.enums import TransactionType, WalletType
 from wallet_system.exceptions import (
@@ -11,6 +14,7 @@ from wallet_system.exceptions import (
     InsufficientFundsError,
     InvalidAmountError,
 )
+from wallet_system.strategies import FeeStrategy, FlatFeeStrategy
 from wallet_system.transaction import (
     Transaction,
     TransactionHistory,
@@ -170,14 +174,21 @@ class PersonalWallet(BaseWallet):
 
 
 class MerchantWallet(BaseWallet):
-    FEE_RATE: ClassVar[float] = 0.015
+    # FEE_RATE: ClassVar[float] = 0.015
+    def __init__(self, owner, opening_balance: float = 0.0, fee_strategy: FeeStrategy | None = None) -> None:
+        super().__init__(owner, opening_balance)
+        self._fee_strategy = fee_strategy or FlatFeeStrategy()
 
     @property
     def wallet_type(self) -> WalletType:
         return WalletType.MERCHANT
 
+    @property
+    def fee_strategy(self):
+        return self._fee_strategy
+
     def deposit(self, amount, *, transaction_type=TransactionType.DEPOSIT) -> None:
         amount = self._validate_amount(amount)
-        fee = round(amount * self.FEE_RATE, 2)
+        fee = self._fee_strategy.calculate_fee(amount)
         super().deposit(amount - fee, transaction_type=transaction_type)
         self._record(fee, TransactionType.FEE)
