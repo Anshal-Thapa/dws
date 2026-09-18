@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    volumes:d
+    volumes:
       - .:/usr/src/app
     ports:
       - "8000:8000"
-    command: python main.py
+    command: pytest --cov
